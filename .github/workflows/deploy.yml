@@ -1,4 +1,4 @@
-name: Deploy WordPress Site
+name: Deploy to AWS
 
 on:
   push:
@@ -8,40 +8,51 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.5.3
-        with:
-          ssh-private-key: ${{ secrets.KEY_PEM_CONTENT }}
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.KEY_PEM_CONTENT }}" > ~/.ssh/key.pem
+        chmod 600 ~/.ssh/key.pem
+        ssh-keyscan -H 18.234.225.159 >> ~/.ssh/known_hosts
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+    - name: Debug - AWS CLI Version
+      run: aws --version
 
-      - name: Get Auto Scaling Group Instances
-        id: get-instances
-        run: |
-          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names wp-asg --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
-          cat instance_ids.txt
+    - name: Get instance IDs
+      id: get-instances
+      run: |
+        aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names wp-asg --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
+        cat instance_ids.txt
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Install jq
-        run: sudo apt-get install -y jq
+    - name: Debug - Instance IDs
+      run: cat instance_ids.txt
 
-      - name: Get Instance IPs
-        run: |
-          aws ec2 describe-instances --instance-ids $(cat instance_ids.txt) --query 'Reservations[*].Instances[*].PublicIpAddress' --output text > instance_ips.txt
-          cat instance_ips.txt
+    - name: Get public IPs of instances
+      id: get-public-ips
+      run: |
+        INSTANCE_IDS=$(cat instance_ids.txt)
+        aws ec2 describe-instances --instance-ids $INSTANCE_IDS --query 'Reservations[*].Instances[*].PublicIpAddress' --output text > public_ips.txt
+        cat public_ips.txt
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Deploy to instances
-        run: |
-          for ip in $(cat instance_ips.txt); do
-            echo "Deploying to $ip"
-            scp -r -o StrictHostKeyChecking=no ./* ubuntu@$ip:/var/www/html/Wordpress
-            ssh -o StrictHostKeyChecking=no ubuntu@$ip "sudo systemctl restart apache2"
-          done
+    - name: Debug - Public IPs
+      run: cat public_ips.txt
+
+    - name: Deploy code to instances
+      run: |
+        PUBLIC_IPS=$(cat public_ips.txt)
+        for ip in $PUBLIC_IPS
+        do
+          echo "Deploying to $ip"
+          scp -i ~/.ssh/key.pem -r ./* ubuntu@$ip:/var/www/html/Wordpress/
+        done
 
