@@ -1,0 +1,41 @@
+name: Deploy WordPress via ASG
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Deploy WordPress Code to EC2 Instances
+      run: |
+        # Retrieve the ASG name and launch template ID
+        ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --query "AutoScalingGroups[?LaunchTemplate.LaunchTemplateId=='your-launch-template-id'].AutoScalingGroupName" --output text)
+        INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name $ASG_NAME --query "AutoScalingGroups[0].Instances[?LifecycleState=='InService'].InstanceId" --output text)
+
+        # Copy the latest code to each instance
+        for INSTANCE_ID in $INSTANCE_IDS; do
+          PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+          scp -o StrictHostKeyChecking=no -i /path/to/your/key.pem -r ./* ubuntu@$PUBLIC_IP:/var/www/html/Wordpress
+        done
+
+    - name: Restart Apache on EC2 Instances
+      run: |
+        for INSTANCE_ID in $INSTANCE_IDS; do
+          PUBLIC_IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+          ssh -o StrictHostKeyChecking=no -i /path/to/your/key.pem ubuntu@$PUBLIC_IP 'sudo systemctl restart apache2'
+        done
+
