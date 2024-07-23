@@ -18,9 +18,13 @@ jobs:
         echo "${{ secrets.KEY_PEM_CONTENT }}" > ~/.ssh/key.pem
         chmod 600 ~/.ssh/key.pem
         ssh-keyscan -H 18.234.225.159 >> ~/.ssh/known_hosts
+      shell: bash
 
     - name: Debug - AWS CLI Version
       run: aws --version
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     - name: Get instance IDs
       id: get-instances
@@ -55,3 +59,4 @@ jobs:
           echo "Deploying to $ip"
           scp -i ~/.ssh/key.pem -r ./* ubuntu@$ip:/var/www/html/Wordpress/
         done
+      shell: bash
