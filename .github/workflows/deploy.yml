@@ -1,4 +1,4 @@
-name: Deploy WordPress
+name: Deploy to ASG
 
 on:
   push:
@@ -8,30 +8,37 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Setup SSH
-        run: |
-          echo "${{ secrets.KEY_PEM_CONTENT }}" > key.pem
-          chmod 600 key.pem
+    - name: Set up SSH
+      run: |
+        echo "${{ secrets.KEY_PEM_CONTENT }}" > key.pem
+        chmod 600 key.pem
 
-      - name: Get instance IPs
-        id: get_instance_ips
-        run: |
-          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names wp-asg --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
-          instance_ids=$(cat instance_ids.txt)
-          for id in $instance_ids; do
-            ip=$(aws ec2 describe-instances --instance-ids $id --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
-            echo $ip >> instance_ips.txt
-          done
-          cat instance_ips.txt
+    - name: Get instance IDs
+      id: get_instance_ids
+      run: |
+        aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names asdf --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
+        cat instance_ids.txt
 
-      - name: Deploy to instances
-        run: |
-          for ip in $(cat instance_ips.txt); do
-            echo "Deploying to $ip"
-            scp -i key.pem -o StrictHostKeyChecking=no -r ./wordpress ubuntu@$ip:/tmp/wordpress
-            ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@$ip "sudo cp -r /tmp/wordpress/* /var/www/html/Wordpress && sudo systemctl restart apache2 && sudo rm -rf /tmp/wordpress"
-          done
+    - name: Get instance IPs
+      id: get_instance_ips
+      run: |
+        while read -r instance_id; do
+          public_ip=$(aws ec2 describe-instances --instance-ids "$instance_id" --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+          echo "$public_ip" >> instance_ips.txt
+        done < instance_ids.txt
+        cat instance_ips.txt
+
+    - name: Deploy to instances
+      run: |
+        for ip in $(cat instance_ips.txt); do
+          echo "Deploying to $ip"
+          scp -i key.pem -o StrictHostKeyChecking=no -r ./* ubuntu@$ip:/tmp/wordpress
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@$ip "sudo cp -r /tmp/wordpress/* /var/www/html/Wordpress && sudo systemctl restart apache2 && sudo rm -rf /tmp/wordpress"
+        done
+      env:
+        SSH_AUTH_SOCK: /tmp/ssh-agent.sock
