@@ -7,7 +7,7 @@
  */
 
 // Add a custom message
-echo "<h1 style='text-align: center; color: blue;'>Hello, this is a test change!</h1>";
+echo "<h1 style='text-align: center; color: blue;'>Hello, this is a test change no.2!</h1>";
 
 /**
  * Tells WordPress to load the WordPress theme and output it.
