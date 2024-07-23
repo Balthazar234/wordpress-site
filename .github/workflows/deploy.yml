@@ -61,6 +61,6 @@ jobs:
           echo "Starting deployment to instances..."
           for ip in $(cat instance_ips.txt); do
             echo "Deploying to $ip"
-            scp -r -o StrictHostKeyChecking=no ./* ubuntu@$ip:/var/www/html/Wordpress
-            ssh -o StrictHostKeyChecking=no ubuntu@$ip "sudo systemctl restart apache2"
+            scp -r -o StrictHostKeyChecking=no ./* ubuntu@$ip:/tmp/wordpress
+            ssh -o StrictHostKeyChecking=no ubuntu@$ip "sudo cp -r /tmp/wordpress/* /var/www/html/Wordpress && sudo systemctl restart apache2"
           done
