@@ -1,4 +1,4 @@
-name: Deploy WordPress Site
+name: Deploy WordPress
 
 on:
   push:
@@ -8,60 +8,30 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.5.3
-        with:
-          ssh-private-key: ${{ secrets.KEY_PEM_CONTENT }}
-
-      - name: Configure AWS credentials
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Setup SSH
         run: |
-          mkdir -p ~/.aws
-          echo "[default]" > ~/.aws/credentials
-          echo "aws_access_key_id = $AWS_ACCESS_KEY_ID" >> ~/.aws/credentials
-          echo "aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" >> ~/.aws/credentials
-          echo "[default]" > ~/.aws/config
-          echo "region = us-east-1" >> ~/.aws/config  # Ensure the correct region is set
+          echo "${{ secrets.KEY_PEM_CONTENT }}" > key.pem
+          chmod 600 key.pem
 
-      - name: Install dependencies
+      - name: Get instance IPs
+        id: get_instance_ips
         run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli jq
-
-      - name: Get Auto Scaling Group Instances
-        id: get-instances
-        run: |
-          echo "Describing Auto Scaling Groups..."
-          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names asdf --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
-          cat instance_ids.txt
-          if [ ! -s instance_ids.txt ]; then
-            echo "No instance IDs found. Exiting."
-            exit 1
-          fi
-
-      - name: Get Instance IPs
-        run: |
-          echo "Describing EC2 Instances..."
-          aws ec2 describe-instances --instance-ids $(cat instance_ids.txt) --query 'Reservations[*].Instances[*].PublicIpAddress' --output text > instance_ips.txt
+          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names wp-asg --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
+          instance_ids=$(cat instance_ids.txt)
+          for id in $instance_ids; do
+            ip=$(aws ec2 describe-instances --instance-ids $id --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+            echo $ip >> instance_ips.txt
+          done
           cat instance_ips.txt
-          if [ ! -s instance_ips.txt ]; then
-            echo "No public IP addresses found. Exiting."
-            exit 1
-          fi
 
       - name: Deploy to instances
         run: |
-          echo "Starting deployment to instances..."
           for ip in $(cat instance_ips.txt); do
             echo "Deploying to $ip"
-            ssh -o StrictHostKeyChecking=no ubuntu@$ip "mkdir -p /tmp/wordpress"
-            scp -r -o StrictHostKeyChecking=no ./* ubuntu@$ip:/tmp/wordpress
-            ssh -o StrictHostKeyChecking=no ubuntu@$ip "sudo cp -r /tmp/wordpress/* /var/www/html/Wordpress && sudo systemctl restart apache2 && sudo rm -rf /tmp/wordpress"
+            scp -i key.pem -o StrictHostKeyChecking=no -r ./wordpress ubuntu@$ip:/tmp/wordpress
+            ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@$ip "sudo cp -r /tmp/wordpress/* /var/www/html/Wordpress && sudo systemctl restart apache2 && sudo rm -rf /tmp/wordpress"
           done
