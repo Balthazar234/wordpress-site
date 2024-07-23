@@ -27,6 +27,8 @@ jobs:
           echo "[default]" > ~/.aws/credentials
           echo "aws_access_key_id = $AWS_ACCESS_KEY_ID" >> ~/.aws/credentials
           echo "aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" >> ~/.aws/credentials
+          echo "[default]" > ~/.aws/config
+          echo "region = us-east-1" >> ~/.aws/config  # Ensure the correct region is set
 
       - name: Install dependencies
         run: |
@@ -36,16 +38,19 @@ jobs:
       - name: Get Auto Scaling Group Instances
         id: get-instances
         run: |
+          echo "Describing Auto Scaling Groups..."
           aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names wp-asg --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
           cat instance_ids.txt
 
       - name: Get Instance IPs
         run: |
+          echo "Describing EC2 Instances..."
           aws ec2 describe-instances --instance-ids $(cat instance_ids.txt) --query 'Reservations[*].Instances[*].PublicIpAddress' --output text > instance_ips.txt
           cat instance_ips.txt
 
       - name: Deploy to instances
         run: |
+          echo "Starting deployment to instances..."
           for ip in $(cat instance_ips.txt); do
             echo "Deploying to $ip"
             scp -r -o StrictHostKeyChecking=no ./* ubuntu@$ip:/var/www/html/Wordpress
