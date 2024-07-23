@@ -6,6 +6,9 @@
  * @package WordPress
  */
 
+// Add a custom message
+echo "<h1 style='text-align: center; color: blue;'>Hello, this is a test change!</h1>";
+
 /**
  * Tells WordPress to load the WordPress theme and output it.
  *
@@ -15,3 +18,4 @@ define( 'WP_USE_THEMES', true );
 
 /** Loads the WordPress Environment and Template */
 require __DIR__ . '/wp-blog-header.php';
+
