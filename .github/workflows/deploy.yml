@@ -28,18 +28,18 @@ jobs:
           echo "aws_access_key_id = $AWS_ACCESS_KEY_ID" >> ~/.aws/credentials
           echo "aws_secret_access_key = $AWS_SECRET_ACCESS_KEY" >> ~/.aws/credentials
           echo "[default]" > ~/.aws/config
-          echo "region = us-east-1" >> ~/.aws/config  # Ensure the correct region is set
-
+          echo "region = us-east-1" >> ~/.aws/config
+          
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y awscli jq
+          sudo apt-get install -y awscli jq rsync
 
       - name: Get Auto Scaling Group Instances
         id: get-instances
         run: |
           echo "Describing Auto Scaling Groups..."
-          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names asdf --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
+          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names wp-ASG --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
           cat instance_ids.txt
           if [ ! -s instance_ids.txt ]; then
             echo "No instance IDs found. Exiting."
@@ -63,6 +63,6 @@ jobs:
             echo "Deploying to $ip"
             ssh -o StrictHostKeyChecking=no ubuntu@$ip "sudo mkdir -p /tmp/wordpress"
             ssh -o StrictHostKeyChecking=no ubuntu@$ip "sudo chown -R ubuntu:ubuntu /tmp/wordpress"
-            scp -o StrictHostKeyChecking=no -r ./* ubuntu@$ip:/tmp/wordpress
+            rsync -avz --exclude='.git' --exclude='.github' --exclude='*.gitignore' ./ ubuntu@$ip:/tmp/wordpress
             ssh -o StrictHostKeyChecking=no ubuntu@$ip "sudo cp -r /tmp/wordpress/* /var/www/html/Wordpress && sudo systemctl restart apache2 && sudo rm -rf /tmp/wordpress"
           done
