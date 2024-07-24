@@ -39,7 +39,7 @@ jobs:
         id: get-instances
         run: |
           echo "Describing Auto Scaling Groups..."
-          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names asdf --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
+          aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names wp-ASG --query 'AutoScalingGroups[0].Instances[*].InstanceId' --output text > instance_ids.txt
           cat instance_ids.txt
           if [ ! -s instance_ids.txt ]; then
             echo "No instance IDs found. Exiting."
