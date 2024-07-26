@@ -7,7 +7,7 @@
  */
 
 // Add a custom welcome message
-echo "<h1 style='text-align: center; color: green;'>BOO00M! Welcome to Your New Blog Title!</h1>";
+echo "<h1 style='text-align: center; color: green;'>DOO00M! Welcome to Puffersoft New Blog Post!</h1>";
 echo "<p style='text-align: center; font-size: 20px;'>This is a custom introduction to your blog. Enjoy your stay!</p>";
 
 /**
