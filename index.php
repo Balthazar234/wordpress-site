@@ -6,8 +6,8 @@
  * @package WordPress
  */
 
-// Add a custom message
-echo "<h1 style='text-align: center; color: blue;'>Hello, this is a test change no.4 Booom!</h1>";
+// Remove the custom message
+// echo "<h1 style='text-align: center; color: blue;'>Hello, this is a test change no.4 Booom!</h1>";
 
 /**
  * Tells WordPress to load the WordPress theme and output it.
